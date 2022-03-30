@@ -87,8 +87,9 @@ TE: trailers`
 		.reduce((a,b) => { a[b[0]] = b[1]; return a },{}),
 });
 const doSleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-const sleep = async (ms) => {
-	let sec = Math.floor(ms / 1000);
+const sleep = async (ms, a, b) => {
+	const sec_ = Math.floor(ms / 1000);
+	let sec = sec_;
 	ms = ms % 1000;
 	for (; sec > 0; --sec) {
 		let str = "";
@@ -97,14 +98,17 @@ const sleep = async (ms) => {
 		if (sec >= 60*60     ) str += Math.floor(sec/(60*60)%24  ) + "h ";
 		if (sec >= 60        ) str += Math.floor(sec/(60)%60     ) + "m ";
 		if (sec >= 1         ) str += Math.floor(sec%60          ) + "s ";
-		process.stdout.write(str);
+		let text = `${a}/${b} ${Math.floor(a/b * 100)}%`;
+		process.stdout.write(text + " " + str);
 		await doSleep(1000);
 		process.stdout.write("\x1b[2K\x1b[0G");
 	}
 	await doSleep(ms);
 };
+const debug = false;
 const drawPixel = async ({ x, y, color }) => {
 	console.log("drawing pixel at", x, y, "with color", color + 1, "#" + colors[color].map(e => e.toString(16).padStart(0, 2)).join(""));
+	if (debug) return { waitSeconds: 10 };
 	let res = await ax({
 		method: "post",
 		url: "pixel",
@@ -174,11 +178,11 @@ for (let i = 0; i < pixels.length; ++i) {
 	while (true) {
 		try {
 			let res = await drawPixel(pixels[i]);
-			await sleep(Math.floor(res.waitSeconds * 1e3));
+			await sleep(Math.floor(res.waitSeconds * 1e3), i+1, pixels.length);
 			break;
 		} catch (err) {
 			console.error(err);
-			await sleep(10e3);
+			await sleep(10e3, i+1, pixels.length);
 		}
 	}
 }
