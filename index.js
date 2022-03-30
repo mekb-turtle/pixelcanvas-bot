@@ -2,15 +2,18 @@
 const axios = require("axios");
 const Jimp = require("jimp");
 const fs = require("fs");
+const path = require("path");
+const { spawn } = require("child_process");
 let unknown;
 let opt = {
 	string: [ "file" ],
-	boolean: [ "help", "random" ],
+	boolean: [ "help", "random", "dither" ],
 	alias: {
 		"help": [ "?" ],
 		"file": [ "f" ],
 		"width": [ "w" ],
 		"height": [ "h" ],
+		"dither": [ "d" ],
 		"x": [ "x_" ],
 		"y": [ "y_" ],
 		"random": [ "r" ],
@@ -31,8 +34,10 @@ if (argv.help) {
 	console.error("--width -w     width of image");
 	console.error("--height -h    height of image");
 	console.error("--random -r    draw each pixel in a random order");
+	console.error("--dither -d    dither the image");
 	console.error("if both width and height are left out, image size will be left as is");
 	console.error("use -x-5 or -x=-5 for negative numbers, -x -5 won't work");
+	console.error("dithering is recommended if the image contains colors that are close to each other, requires ImageMagick");
 	return;
 }
 const isStr = (e, a, p) => {
@@ -54,12 +59,14 @@ if (argv.width != null || argv.height != null) {
 	if (isNum(argv.height, "--height")) return;
 }
 if (isStr(argv.file, "--file")) return;
-const colors = [
-	[ 255, 255, 255 ], [ 228, 228, 228 ], [ 136, 136, 136 ], [ 34,  34,  34  ],
-	[ 255, 167, 209 ], [ 229, 0,   0   ], [ 229, 149, 0   ], [ 160, 106, 66  ],
-	[ 229, 217, 0   ], [ 148, 224, 68  ], [ 2,   190, 1   ], [ 0,   211, 221 ],
-	[ 0,   131, 199 ], [ 0,   0,   234 ], [ 207, 110, 228 ], [ 130, 0,   128 ],
-];
+const paletteFile = path.resolve(__dirname, "./palette.png");
+const palette = await Jimp.read(paletteFile);
+let colors_ = [];
+palette.scan(0, 0, palette.bitmap.width, palette.bitmap.height, (x, y, i) => {
+	if (palette.bitmap.data[i + 3] > 127)
+		colors_.push([palette.bitmap.data[i + 0], palette.bitmap.data[i + 1], palette.bitmap.data[i + 2]]);
+});
+const colors = colors_; delete colors_;
 require("dotenv").config();
 const ax = axios.create({
 	baseURL: "https://pixelcanvas.io/api/",
@@ -123,7 +130,29 @@ const nearest = (r, g, b) => {
 	}
 	return j;
 };
-const image = await Jimp.read(argv.file);
+let file;
+if (argv.dither) {
+	const im = await Jimp.read(argv.file);
+	const imBuf = await im.getBufferAsync("image/png");
+	var proc = spawn("magick", [
+		"convert", "-dither", "FloydSteinberg", "-remap", paletteFile, "--", "png:-", "png:-"
+	]);
+	let buffers = [];
+	proc.stdout.on("data", b => buffers.push(b));
+	proc.stdin.write(imBuf);
+	proc.stdin.end();
+	await new Promise((resolve, reject) => {
+		proc.once("error", reject);
+		proc.once("exit", (c) => {
+			if (c > 0) reject("magick exited with code", c);
+			resolve();
+		});
+	});
+	file = Buffer.concat(buffers);
+} else {
+	file = argv.file;
+}
+const image = await Jimp.read(file);
 if (argv.width && argv.height)
 	image.resize(argv.width, argv.height);
 let pixels = [];
