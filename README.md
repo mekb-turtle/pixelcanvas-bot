@@ -10,4 +10,5 @@ Set up:
 - Open one of the network requests that says `pixel` (not `online` or `X.Y.bmp`)
 - The first line of `.env` should be `FIREBASE=` followed by the value of `X-Firebase-AppCheck` in the request headers
 - The second line of `.env` should be `FINGERPRINT=` followed by the value of `fingerprint` in the request body as JSON
-- Run `node . --help` in the directory of the repository
+- Run `npm i` in the directory to install the dependencies
+- Use `node . --help` for help
