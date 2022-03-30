@@ -72,7 +72,6 @@ if (argv.width != null || argv.height != null) {
 	if (isNum(argv.width,  "--width", true))  return;
 	if (isNum(argv.height, "--height", true)) return;
 }
-if (!argv.output && argv.debug && argv.quiet) return;
 if (isStr(argv.file, "--file")) return;
 const paletteFile = path.resolve(__dirname, "./palette.png");
 const palette = await Jimp.read(paletteFile);
@@ -185,9 +184,8 @@ if ((argv.width && argv.height) || argv.dither) {
 } else {
 	file = argv.file;
 }
+if (argv.debug && argv.quiet) return;
 const image = await Jimp.read(file);
-if (argv.width && argv.height)
-	image.resize(argv.width, argv.height);
 let pixels = [];
 image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 	let [ r, g, b, a ] = image.bitmap.data.slice(i, i+4);
