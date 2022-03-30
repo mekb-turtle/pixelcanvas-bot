@@ -92,11 +92,11 @@ const sleep = async (ms) => {
 	ms = ms % 1000;
 	for (; sec > 0; --sec) {
 		let str = "";
-		if (sec >= 60*60*24*7) str += Math.floor(sec / 60*60*24*7) + "w ";
-		if (sec >= 60*60*24  ) str += Math.floor(sec / 60*60*24  ) + "d ";
-		if (sec >= 60*60     ) str += Math.floor(sec / 60*60     ) + "h ";
-		if (sec >= 60        ) str += Math.floor(sec / 60        ) + "m ";
-		if (sec >= 1         ) str += Math.floor(sec             ) + "s ";
+		if (sec >= 60*60*24*7) str += Math.floor(sec/(60*60*24*7)) + "w ";
+		if (sec >= 60*60*24  ) str += Math.floor(sec/(60*60*24)%7) + "d ";
+		if (sec >= 60*60     ) str += Math.floor(sec/(60*60)%24  ) + "h ";
+		if (sec >= 60        ) str += Math.floor(sec/(60)%60     ) + "m ";
+		if (sec >= 1         ) str += Math.floor(sec%60          ) + "s ";
 		process.stdout.write(str);
 		await doSleep(1000);
 		process.stdout.write("\x1b[2K\x1b[0G");
