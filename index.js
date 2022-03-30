@@ -104,7 +104,7 @@ const sleep = async (ms) => {
 	await doSleep(ms);
 };
 const drawPixel = async ({ x, y, color }) => {
-	console.log("drawing pixel at", x, y, "with color", color);
+	console.log("drawing pixel at", x, y, "with color", color + 1, "#" + colors[color].map(e => e.toString(16).padStart(0, 2)).join(""));
 	let res = await ax({
 		method: "post",
 		url: "pixel",
