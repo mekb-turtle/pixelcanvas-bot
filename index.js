@@ -37,7 +37,8 @@ if (argv.help) {
 	console.error("--dither -d    dither the image");
 	console.error("if both width and height are left out, image size will be left as is");
 	console.error("use -x-5 or -x=-5 for negative numbers, -x -5 won't work");
-	console.error("dithering is recommended if the image contains colors that are close to each other, requires ImageMagick");
+	console.error("dithering is recommended if the image contains colors that are close to each other, not recommended if it's small");
+	console.error("dithering requires ImageMagick");
 	return;
 }
 const isStr = (e, a, p) => {
