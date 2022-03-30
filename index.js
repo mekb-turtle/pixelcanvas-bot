@@ -180,7 +180,6 @@ for (let i = 0; i < pixels.length; ++i) {
 			console.error(err);
 			await sleep(10e3);
 		}
-		if (!repeat) break;
 	}
 }
 })();
