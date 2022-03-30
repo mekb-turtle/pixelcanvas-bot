@@ -171,13 +171,16 @@ image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 });
 if (argv.random) pixels.sort(() => Math.random() - 0.5);
 for (let i = 0; i < pixels.length; ++i) {
-	let wait = 10000;
-	try {
-		let res = await drawPixel(pixels[i]);
-		wait = Math.floor(res.waitSeconds * 1000);
-	} catch (err) {
-		console.error(err);
+	while (true) {
+		try {
+			let res = await drawPixel(pixels[i]);
+			await sleep(Math.floor(res.waitSeconds * 1e3));
+			break;
+		} catch (err) {
+			console.error(err);
+			await sleep(10e3);
+		}
+		if (!repeat) break;
 	}
-	await sleep(wait);
 }
 })();
