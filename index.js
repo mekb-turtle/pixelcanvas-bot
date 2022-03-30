@@ -6,8 +6,8 @@ const path = require("path");
 const { spawn } = require("child_process");
 let unknown;
 let opt = {
-	string: [ "file" ],
-	boolean: [ "help", "random", "dither" ],
+	string: [ "file", "output" ],
+	boolean: [ "help", "random", "dither", "ignore", "quiet", "debug" ],
 	alias: {
 		"help": [ "?" ],
 		"file": [ "f" ],
@@ -17,31 +17,41 @@ let opt = {
 		"x": [ "x_" ],
 		"y": [ "y_" ],
 		"random": [ "r" ],
+		"ignore": [ "i" ],
+		"debug": [ "D" ],
+		"quiet": [ "q" ],
+		"output": [ "o" ],
 	},
 	unknown: (e) => { unknown = e; },
 };
 const argv = require("minimist")(process.argv.splice(2), opt);
+if (argv.help) {
+	console.error("required:");
+	console.error("  --file -f       what file to draw");
+	console.error("  -x              left-most pixel of the image");
+	console.error("  -y              top-most pixel of the image");
+	console.error("use -x-5 or -x=-5 for negative numbers, -x -5 won't work");
+	console.error("image:");
+	console.error("  --width -w      width of image");
+	console.error("  --height -h     height of image");
+	console.error("if both width and height are left out, image size will be left as is");
+	console.error("  --random -r     draw each pixel in a random order");
+	console.error("  --dither -d     dither the image");
+	console.error("  --ignore -i     don't draw white pixels, act as if all pixels are white by default");
+	console.error("output:");
+	console.error("  --debug -D      don't actually draw anything, just say what would be drawn");
+	console.error("  --quiet -q      don't output anything, overrides --debug");
+	console.error("  --output -o     output image of what would be drawn to a file");
+	console.error("  --help -?       help");
+	console.error("");
+	return;
+}
 if (unknown == null && argv._.length) unknown = argv._[0];
 if (unknown) {
 	console.error("unexpected", unknown);
 	return;
 }
-if (argv.help) {
-	console.error("--help -?      help");
-	console.error("--file -f      what file to draw");
-	console.error("-x             left-most pixel of the image");
-	console.error("-y             top-most pixel of the image");
-	console.error("--width -w     width of image");
-	console.error("--height -h    height of image");
-	console.error("--random -r    draw each pixel in a random order");
-	console.error("--dither -d    dither the image");
-	console.error("if both width and height are left out, image size will be left as is");
-	console.error("use -x-5 or -x=-5 for negative numbers, -x -5 won't work");
-	console.error("dithering is recommended if the image contains colors that are close to each other, not recommended if it's small");
-	console.error("dithering requires ImageMagick");
-	return;
-}
-const isStr = (e, a, p) => {
+const isStr = (e, a) => {
 	if (typeof e != "string" || e == null || e == "") {
 		console.error(`missing ${a}`);
 		return true;
@@ -55,10 +65,14 @@ const isNum = (e, a, p) => {
 }
 if (isNum(argv.x, "-x")) return;
 if (isNum(argv.y, "-y")) return;
-if (argv.width != null || argv.height != null) {
-	if (isNum(argv.width,  "--width"))  return;
-	if (isNum(argv.height, "--height")) return;
+if (argv.output != null) {
+	if (isStr(argv.output, "--output")) return;
 }
+if (argv.width != null || argv.height != null) {
+	if (isNum(argv.width,  "--width", true))  return;
+	if (isNum(argv.height, "--height", true)) return;
+}
+if (!argv.output && argv.debug && argv.quiet) return;
 if (isStr(argv.file, "--file")) return;
 const paletteFile = path.resolve(__dirname, "./palette.png");
 const palette = await Jimp.read(paletteFile);
@@ -67,6 +81,10 @@ palette.scan(0, 0, palette.bitmap.width, palette.bitmap.height, (x, y, i) => {
 	if (palette.bitmap.data[i + 3] > 127)
 		colors_.push([palette.bitmap.data[i + 0], palette.bitmap.data[i + 1], palette.bitmap.data[i + 2]]);
 });
+colorNames = [
+	"white", "light gray", "dark gray", "black", "pink", "red", "orange", "brown",
+	"yellow", "light green", "green", "aqua", "cyan", "blue", "magenta", "purple"
+];
 const colors = colors_; delete colors_;
 require("dotenv").config();
 const ax = axios.create({
@@ -99,16 +117,15 @@ const sleep = async (ms, a, b) => {
 		if (sec >= 60        ) str += Math.floor(sec/(60)%60     ) + "m ";
 		if (sec >= 1         ) str += Math.floor(sec%60          ) + "s ";
 		let text = `${a}/${b} ${Math.floor(a/b * 100)}%`;
-		process.stdout.write(text + " " + str);
+		if (!argv.quiet) process.stderr.write(text + " " + str);
 		await doSleep(1000);
-		process.stdout.write("\x1b[2K\x1b[0G");
+		if (!argv.quiet) process.stderr.write("\x1b[2K\x1b[0G");
 	}
 	await doSleep(ms);
 };
-const debug = false;
 const drawPixel = async ({ x, y, color }) => {
-	console.log("drawing pixel at", x, y, "with color", color + 1, "#" + colors[color].map(e => e.toString(16).padStart(0, 2)).join(""));
-	if (debug) return { waitSeconds: 10 };
+	if (!argv.quiet) console.log("drawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
+	if (argv.debug) return { };
 	let res = await ax({
 		method: "post",
 		url: "pixel",
@@ -136,11 +153,18 @@ const nearest = (r, g, b) => {
 	return j;
 };
 let file;
-if (argv.dither) {
+if ((argv.width && argv.height) || argv.dither) {
 	const im = await Jimp.read(argv.file);
 	const imBuf = await im.getBufferAsync("image/png");
 	var proc = spawn("magick", [
-		"convert", "-dither", "FloydSteinberg", "-remap", paletteFile, "--", "png:-", "png:-"
+		"convert",
+		...(argv.width && argv.height ? [
+			"-size", `${argv.width}x${argv.height}`
+		] : []),
+		...(argv.dither ? [
+			"-dither", "FloydSteinberg", "-remap", paletteFile,
+		] : []),
+		"--", "png:-", "png:-"
 	]);
 	let buffers = [];
 	proc.stdout.on("data", b => buffers.push(b));
@@ -154,6 +178,10 @@ if (argv.dither) {
 		});
 	});
 	file = Buffer.concat(buffers);
+	delete buffers;
+	if (argv.output) {
+		await fs.promises.writeFile(argv.output, file);
+	}
 } else {
 	file = argv.file;
 }
@@ -162,14 +190,12 @@ if (argv.width && argv.height)
 	image.resize(argv.width, argv.height);
 let pixels = [];
 image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
-	let r = image.bitmap.data[i + 0];
-	let g = image.bitmap.data[i + 1];
-	let b = image.bitmap.data[i + 2];
-	let a = image.bitmap.data[i + 3];
+	let [ r, g, b, a ] = image.bitmap.data.slice(i, i+4);
 	if (a > 127) {
 		let X = x + argv.x;
 		let Y = y + argv.y;
 		let color = nearest(r, g, b);
+		if (color == 0 && argv.ignore) return; 
 		pixels.push({ x: X, y: Y, color });
 	}
 });
@@ -178,10 +204,12 @@ for (let i = 0; i < pixels.length; ++i) {
 	while (true) {
 		try {
 			let res = await drawPixel(pixels[i]);
+			if (argv.debug) break;
 			await sleep(Math.floor(res.waitSeconds * 1e3), i+1, pixels.length);
 			break;
 		} catch (err) {
 			console.error(err);
+			if (argv.debug) break;	
 			await sleep(10e3, i+1, pixels.length);
 		}
 	}
