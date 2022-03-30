@@ -26,8 +26,8 @@ if (unknown) {
 if (argv.help) {
 	console.error("--help -?      help");
 	console.error("--file -f      what file to draw");
-	console.error("-x             left-most pixel");
-	console.error("-y             top-most pixel");
+	console.error("-x             left-most pixel of the image");
+	console.error("-y             top-most pixel of the image");
 	console.error("--width -w     width of image");
 	console.error("--height -h    height of image");
 	console.error("--random -r    draw each pixel in a random order");
