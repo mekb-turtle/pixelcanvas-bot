@@ -158,7 +158,7 @@ const nearest = (r, g, b) => {
 	return j;
 };
 let file;
-if ((argv.width && argv.height) || argv.dither) {
+if ((argv.width && argv.height) || argv.dither || argv.output) {
 	const im = await Jimp.read(argv.file);
 	const imBuf = await im.getBufferAsync("image/png");
 	var proc = spawn("magick", [
