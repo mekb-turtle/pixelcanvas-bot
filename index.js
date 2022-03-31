@@ -63,14 +63,20 @@ const isNum = (e, a, p) => {
 		return true;
 	}
 }
-if (isNum(argv.x, "-x")) return;
-if (isNum(argv.y, "-y")) return;
 if (argv.output != null) {
 	if (isStr(argv.output, "--output")) return;
 }
-if (argv.width != null || argv.height != null) {
-	if (isNum(argv.width,  "--width", true))  return;
-	if (isNum(argv.height, "--height", true)) return;
+if (!argv.debug || !argv.quiet) {
+	if (argv.x == null && argv.y == null && argv.debug)
+		argv.x = argv.y = 0;
+	if (isNum(argv.x, "-x")) return;
+	if (isNum(argv.y, "-y")) return;
+	if (argv.width != null || argv.height != null) {
+		if (isNum(argv.width,  "--width", true))  return;
+		if (isNum(argv.height, "--height", true)) return;
+	}
+} else {
+	argv.x = argv.y = argv.width = argv.height = null;
 }
 if (isStr(argv.file, "--file")) return;
 const paletteFile = path.resolve(__dirname, "./palette.png");
