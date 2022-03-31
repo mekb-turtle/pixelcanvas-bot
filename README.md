@@ -1,6 +1,8 @@
 ### [Pixel Canvas](https://pixelcanvas.io) bot
 
-Set up:
+## ![Color Palette](palette_preview.png)
+
+Setup:
 - Install [Node.js](https://nodejs.org/) and [ImageMagick](https://imagemagick.org/)
 - Clone the repository using `git clone https://github.com/mekb-turtle/pixel-canvas-bot.git` or download .zip/.tar.gz of the repository and extract it
 - Create a new file called `.env` in the directory of the repository
