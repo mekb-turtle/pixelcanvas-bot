@@ -14,7 +14,7 @@ let opt = {
 		"width": [ "w" ],
 		"height": [ "h" ],
 		"dither": [ "d" ],
-		"x": [ "x_" ],
+		"x": [ "x_" ], // this is required otherwise it'll think this is unknown
 		"y": [ "y_" ],
 		"random": [ "r" ],
 		"ignore": [ "i" ],
@@ -79,12 +79,13 @@ if (!argv.debug || !argv.quiet) {
 	argv.x = argv.y = argv.width = argv.height = null;
 }
 if (isStr(argv.file, "--file")) return;
-const paletteFile = path.resolve(__dirname, "./palette.png");
+if (argv.debug && argv.quiet && !argv.output) return;
+const paletteFile = path.resolve(__dirname, "./palette.png"); // read palette image
 const palette = await Jimp.read(paletteFile);
 let colors_ = [];
 palette.scan(0, 0, palette.bitmap.width, palette.bitmap.height, (x, y, i) => {
-	if (palette.bitmap.data[i + 3] > 127)
-		colors_.push([palette.bitmap.data[i + 0], palette.bitmap.data[i + 1], palette.bitmap.data[i + 2]]);
+	if (palette.bitmap.data[i + 3] > 127) // make sure the color isn't transparent
+		colors_.push([palette.bitmap.data[i + 0], palette.bitmap.data[i + 1], palette.bitmap.data[i + 2]]); // no need for alpha
 });
 colorNames = [
 	"white", "light gray", "dark gray", "black", "pink", "red", "orange", "brown",
@@ -107,7 +108,7 @@ Cache-Control: no-cache
 TE: trailers`
 		.split("\n")
 		.map(e => [ e.split(": ")[0], e.split(": ").splice(1) ])
-		.reduce((a,b) => { a[b[0]] = b[1]; return a },{}),
+		.reduce((a,b) => { a[b[0]] = b[1]; return a }, {}),
 });
 const doSleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const sleep = async (ms, a, b) => {
@@ -115,7 +116,7 @@ const sleep = async (ms, a, b) => {
 	let sec = sec_;
 	ms = ms % 1000;
 	for (; sec > 0; --sec) {
-		let str = "";
+		let str = ""; // human readable time
 		if (sec >= 60*60*24*7) str += Math.floor(sec/(60*60*24*7)) + "w ";
 		if (sec >= 60*60*24  ) str += Math.floor(sec/(60*60*24)%7) + "d ";
 		if (sec >= 60*60     ) str += Math.floor(sec/(60*60)%24  ) + "h ";
@@ -145,9 +146,9 @@ const drawPixel = async ({ x, y, color }) => {
 	return res.data.result.data;
 };
 const dist3d = (x1, y1, z1, x2, y2, z2) => Math.sqrt(((x1-x2)**2) + ((y1-y2)**2) + ((z1-z2)**2));
-const nearest = (r, g, b) => {
+const nearest = (r, g, b) => { // get nearest color
 	let j;
-	let dist = Infinity;
+	let dist = Infinity; // start at infinity, too lazy for null check
 	for (let i = 0; i < colors.length; ++i) {
 		let newDist = dist3d(r, g, b, ...colors[i]);
 		if (newDist < dist) {
@@ -157,24 +158,29 @@ const nearest = (r, g, b) => {
 	}
 	return j;
 };
-let file;
-if ((argv.width && argv.height) || argv.dither || argv.output) {
-	const im = await Jimp.read(argv.file);
-	const imBuf = await im.getBufferAsync("image/png");
+let image;
+if ((argv.width && argv.height) || argv.dither) {
+	const buf = await (await Jimp.read(argv.file)).getBufferAsync("image/png");
+	// get Jimp to convert to PNG. if a user puts "png:-" for the file name,
+	// magick will think we're putting the file in through stdin, and it'll hang.
+	// this is a hacky work around
 	var proc = spawn("magick", [
 		"convert",
 		...(argv.width && argv.height ? [
+			// set flags if resizing, Jimp's resize is weird
 			"-size", `${argv.width}x${argv.height}`
 		] : []),
 		...(argv.dither ? [
+			// set flags if dithering
 			"-dither", "FloydSteinberg", "-remap", paletteFile,
 		] : []),
-		"--", "png:-", "png:-"
+		"--", "png:-", "png:-" // input = stdin png, output = stdout png
 	]);
 	let buffers = [];
-	proc.stdout.on("data", b => buffers.push(b));
-	proc.stdin.write(imBuf);
-	proc.stdin.end();
+	proc.stdout.on("data", b => buffers.push(b)); // add the buffer to array
+	proc.stdin.write(buf); // write the PNG image data
+	delete buf; // don't need anymore
+	proc.stdin.end(); // we're not writing anymore, close stdin
 	await new Promise((resolve, reject) => {
 		proc.once("error", reject);
 		proc.once("exit", (c) => {
@@ -182,39 +188,56 @@ if ((argv.width && argv.height) || argv.dither || argv.output) {
 			resolve();
 		});
 	});
-	file = Buffer.concat(buffers);
-	delete buffers;
-	if (argv.output) {
-		await fs.promises.writeFile(argv.output, file);
-	}
+	// concat the buffers into one and get Jimp
+	// the output image won't have this if we use nearest in the scan function instead
+	image = await Jimp.read(Buffer.concat(buffers));
+	delete buffers; // don't need anymore
 } else {
-	file = argv.file;
+	image = await Jimp.read(argv.file);
+}
+image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
+	let [ r, g, b, a ] = image.bitmap.data.slice(i, i+4); // destructuring assignment OP
+	if (a > 127) {
+		[ r, g, b ] = colors[nearest(r, g, b)]; // get nearest color
+		a = 255;
+	} else {
+		r = g = b = a = 0;
+	}
+	image.bitmap.data[i+0] = r;
+	image.bitmap.data[i+1] = g;
+	image.bitmap.data[i+2] = b;
+	image.bitmap.data[i+3] = a;
+});
+if (argv.output) {
+	await fs.promises.writeFile(argv.output, await image.getBufferAsync("image/png"));
 }
 if (argv.debug && argv.quiet) return;
-const image = await Jimp.read(file);
 let pixels = [];
 image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 	let [ r, g, b, a ] = image.bitmap.data.slice(i, i+4);
 	if (a > 127) {
 		let X = x + argv.x;
 		let Y = y + argv.y;
-		let color = nearest(r, g, b);
+		// don't need to use nearest twice
+		let color = colors.map(e => e.join()).indexOf([r, g, b].join());
+		// indexOf doesn't work with an array of arrays, but array of strings work
 		if (color == 0 && argv.ignore) return; 
 		pixels.push({ x: X, y: Y, color });
 	}
 });
-if (argv.random) pixels.sort(() => Math.random() - 0.5);
+delete image; // don't need anymore
+if (argv.random) pixels.sort(() => Math.random() - 0.5); // shuffle array
 for (let i = 0; i < pixels.length; ++i) {
 	while (true) {
 		try {
 			let res = await drawPixel(pixels[i]);
-			if (argv.debug) break;
+			if (argv.debug) break; // don't sleep with --debug
 			await sleep(Math.floor(res.waitSeconds * 1e3), i+1, pixels.length);
 			break;
 		} catch (err) {
 			console.error(err);
-			if (argv.debug) break;	
-			await sleep(10e3, i+1, pixels.length);
+			if (argv.debug) break;
+			await sleep(10e3, i+1, pixels.length); // wait 10 seconds 
 		}
 	}
 }
