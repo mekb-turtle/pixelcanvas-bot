@@ -6,13 +6,13 @@ const path = require("path");
 const { spawn } = require("child_process");
 let unknown;
 let opt = {
-	string: [ "file", "output" ],
+	string: [ "file", "output", "expiry" ],
 	boolean: [ "help", "random", "dither", "ignore", "quiet", "debug" ],
 	alias: {
 		"help": [ "?" ],
 		"file": [ "f" ],
-		"width": [ "w" ],
-		"height": [ "h" ],
+//		"width": [ "w" ], // resizing currently doesn't work
+//		"height": [ "h" ],
 		"dither": [ "d" ],
 		"x": [ "x_" ], // this is required otherwise it'll think this is unknown
 		"y": [ "y_" ],
@@ -21,6 +21,7 @@ let opt = {
 		"debug": [ "D" ],
 		"quiet": [ "q" ],
 		"output": [ "o" ],
+		"expiry": [ "e" ],
 	},
 	unknown: (e) => { unknown = e; },
 };
@@ -32,9 +33,9 @@ if (argv.help) {
 	console.error("  -y              top-most pixel of the image");
 	console.error("use -x-5 or -x=-5 for negative numbers, -x -5 won't work");
 	console.error("image:");
-	console.error("  --width -w      width of image");
-	console.error("  --height -h     height of image");
-	console.error("if both width and height are left out, image size will be left as is");
+//	console.error("  --width -w      width of image");
+//	console.error("  --height -h     height of image");
+//	console.error("if both width and height are left out, image size will be left as is");
 	console.error("  --random -r     draw each pixel in a random order");
 	console.error("  --dither -d     dither the image");
 	console.error("  --ignore -i     don't draw white pixels, act as if all pixels are white by default");
@@ -42,14 +43,15 @@ if (argv.help) {
 	console.error("  --debug -D      don't actually draw anything, just say what would be drawn");
 	console.error("  --quiet -q      don't output anything, overrides --debug");
 	console.error("  --output -o     output image of what would be drawn to a file");
+	console.error("  --expiry -e     expiry time of cache, default: 1h");
 	console.error("  --help -?       help");
 	console.error("");
-	return;
+	return 8;
 }
 if (unknown == null && argv._.length) unknown = argv._[0];
 if (unknown) {
 	console.error("unexpected", unknown);
-	return;
+	return 7;
 }
 const isStr = (e, a) => {
 	if (typeof e != "string" || e == null || e == "") {
@@ -64,22 +66,32 @@ const isNum = (e, a, p) => {
 	}
 }
 if (argv.output != null) {
-	if (isStr(argv.output, "--output")) return;
+	if (isStr(argv.output, "--output")) return 7;
 }
 if (!argv.debug || !argv.quiet) {
 	if (argv.x == null && argv.y == null && argv.debug)
 		argv.x = argv.y = 0;
-	if (isNum(argv.x, "-x")) return;
-	if (isNum(argv.y, "-y")) return;
+	if (isNum(argv.x, "-x")) return 7;
+	if (isNum(argv.y, "-y")) return 7;
 	if (argv.width != null || argv.height != null) {
-		if (isNum(argv.width,  "--width", true))  return;
-		if (isNum(argv.height, "--height", true)) return;
+		if (isNum(argv.width,  "--width", true))  return 7;
+		if (isNum(argv.height, "--height", true)) return 7;
 	}
 } else {
 	argv.x = argv.y = argv.width = argv.height = null;
 }
-if (isStr(argv.file, "--file")) return;
-if (argv.debug && argv.quiet && !argv.output) return;
+if (argv.expiry == null) argv.expiry = "1h";
+if (isStr(argv.expiry, "--expiry")) return 7;
+let expiryMatch = argv.expiry.match(/^(?:([0-6])d)?(?:([0-9]|1[0-9]|2[0-3])h)?(?:([0-9]|[1-5][0-9])m)?(?:([0-9]|[1-5][0-9])s)?$/i);
+if (!expiryMatch) { console.error("invalid --expiry"); return 7; }
+let expiryTime = 0;
+if (expiryMatch[1]) expiryTime += parseInt(expiryMatch[1]) * 24 * 3600e3;
+if (expiryMatch[2]) expiryTime += parseInt(expiryMatch[2]) * 3600e3;
+if (expiryMatch[3]) expiryTime += parseInt(expiryMatch[3]) * 60e3;
+if (expiryMatch[4]) expiryTime += parseInt(expiryMatch[4]) * 1e3;
+delete expiryMatch;
+if (isStr(argv.file, "--file")) return 7;
+if (argv.debug && argv.quiet && !argv.output) return 0;
 const paletteFile = path.resolve(__dirname, "./palette.png"); // read palette image
 const palette = await Jimp.read(paletteFile);
 let colors_ = [];
@@ -87,7 +99,7 @@ palette.scan(0, 0, palette.bitmap.width, palette.bitmap.height, (x, y, i) => {
 	if (palette.bitmap.data[i + 3] > 127) // make sure the color isn't transparent
 		colors_.push([palette.bitmap.data[i + 0], palette.bitmap.data[i + 1], palette.bitmap.data[i + 2]]); // no need for alpha
 });
-colorNames = [
+const colorNames = [
 	"white", "light gray", "dark gray", "black", "pink", "red", "orange", "brown",
 	"yellow", "light green", "green", "aqua", "cyan", "blue", "magenta", "purple"
 ];
@@ -95,7 +107,7 @@ const colors = colors_; delete colors_;
 require("dotenv").config();
 const ax = axios.create({
 	baseURL: "https://pixelcanvas.io/api/",
-	timeout: 5000,
+	timeout: 10000,
 	headers: `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0
 X-Firebase-AppCheck: ${process.env.FIREBASE}
 Origin: https://pixelcanvas.io
@@ -110,6 +122,53 @@ TE: trailers`
 		.map(e => [ e.split(": ")[0], e.split(": ").splice(1) ])
 		.reduce((a,b) => { a[b[0]] = b[1]; return a }, {}),
 });
+const chunkSize = 64;
+const bigChunks = 15;
+const bigChunkSize = chunkSize*bigChunks;
+const bigChunkDiff = chunkSize*7;
+const chunkCache = {};
+const getChunk = async (cx, cy) => {
+	let cacheName = `${cx}.${cy}`;
+	if (Date.now() - expiryTime > chunkCache[cacheName]?.creation) {
+		delete chunkCache[cacheName];
+	}
+	if (!chunkCache[cacheName]) {
+		let res = await ax({
+			method: "get",
+			url: `bigchunk/${cx}.${cy}.bmp`,
+			responseType: "arraybuffer"
+		});
+		let chunks = [];
+		for (let j = 0; j < bigChunks**2; ++j) { // loop all 15x15 chunks
+			chunks.push(Buffer.alloc(chunkSize**2)); // add to chunk array
+			for (let i = 0; i < chunkSize**2/2; ++i) {
+				let i_ = i + (j/2*chunkSize**2);
+				chunks[j][i*2]   = res.data[i_] >> 4; // high byte
+				chunks[j][i*2+1] = res.data[i_] & 0x0F; // low byte
+			}
+		}
+		delete res;
+		let bigChunk = [];
+		for (let j = 0; j < bigChunkSize**2; ++j) {
+			let x_ = j % bigChunkSize; // current x
+			let y_ = Math.floor(j / bigChunkSize); // current y
+			let i_ = Math.floor(x_ / chunkSize) + Math.floor(y_ / chunkSize) * bigChunks; // current chunk index
+			let x = x_ % chunkSize; // current x in chunk
+			let y = y_ % chunkSize; // current y in chunk
+			let i = x + y * chunkSize; // current index in chunk
+			bigChunk.push(chunks[i_][i]);
+		}
+		delete chunks;
+		chunkCache[cacheName] = { creation: Date.now(), data: bigChunk };
+	}
+	return chunkCache[`${cx}.${cy}`];
+};
+// mod converts a position to the position in that chunk
+const mod = (e) => (e+bigChunkDiff<0 ? bigChunkSize-1-(-e-1-bigChunkDiff)%bigChunkSize : (e+bigChunkDiff)%bigChunkSize);
+// div converts a position to what chunk it's in
+const div = (e) => e==0?0 : Math.floor((e+bigChunkDiff)/bigChunkSize)*15;
+// gets the color of the pixel at a position
+const getPixel = async (x, y) => (await getChunk(div(x),div(y))).data[mod(x)+mod(y)*bigChunkSize];
 const doSleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const sleep = async (ms, a, b) => {
 	const sec_ = Math.floor(ms / 1000);
@@ -130,8 +189,10 @@ const sleep = async (ms, a, b) => {
 	await doSleep(ms);
 };
 const drawPixel = async ({ x, y, color }) => {
-	if (!argv.quiet) console.log("drawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
+	let skipped = argv.debug ? false : (color == await getPixel(x, y));
+	if (!argv.quiet) console.log((skipped ? "skipped " : "") + "drawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
 	if (argv.debug) return { };
+	if (skipped) return { };
 	let res = await ax({
 		method: "post",
 		url: "pixel",
@@ -211,7 +272,7 @@ image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 if (argv.output) {
 	await fs.promises.writeFile(argv.output, await image.getBufferAsync("image/png"));
 }
-if (argv.debug && argv.quiet) return;
+if (argv.debug && argv.quiet) return 0;
 let pixels = [];
 image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 	let [ r, g, b, a ] = image.bitmap.data.slice(i, i+4);
@@ -236,9 +297,9 @@ for (let i = 0; i < pixels.length; ++i) {
 			break;
 		} catch (err) {
 			console.error(err);
-			if (argv.debug) break;
-			await sleep(10e3, i+1, pixels.length); // wait 10 seconds 
+			return 2;
 		}
 	}
 }
-})();
+return 0;
+})().then(e => process.exit(e || 0));
