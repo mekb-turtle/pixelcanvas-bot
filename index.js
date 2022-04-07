@@ -7,7 +7,7 @@ const { spawn } = require("child_process");
 let unknown;
 let opt = {
 	string: [ "file", "output", "expiry" ],
-	boolean: [ "help", "random", "dither", "ignore", "quiet", "debug" ],
+	boolean: [ "help", "random", "reverse", "dither", "ignore", "quiet", "debug" ],
 	alias: {
 		"help": [ "?" ],
 		"file": [ "f" ],
@@ -17,6 +17,7 @@ let opt = {
 		"x": [ "x_" ], // this is required otherwise it'll think this is unknown
 		"y": [ "y_" ],
 		"random": [ "r" ],
+		"reverse": [ "R" ],
 		"ignore": [ "i" ],
 		"debug": [ "D" ],
 		"quiet": [ "q" ],
@@ -37,6 +38,7 @@ if (argv.help) {
 //	console.error("  --height -h     height of image");
 //	console.error("if both width and height are left out, image size will be left as is");
 	console.error("  --random -r     draw each pixel in a random order");
+	console.error("  --reverse -R    reverse order to draw pixels");
 	console.error("  --dither -d     dither the image");
 	console.error("  --ignore -i     don't draw white pixels, act as if all pixels are white by default");
 	console.error("output:");
@@ -289,6 +291,7 @@ image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 });
 delete image; // don't need anymore
 if (argv.random) pixels.sort(() => Math.random() - 0.5); // shuffle array
+if (argv.reverse) pixels.reverse(); // reverse array
 for (let i = 0; i < pixels.length; ++i) {
 	while (true) {
 		try {
