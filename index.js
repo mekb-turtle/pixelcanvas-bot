@@ -222,6 +222,8 @@ const nearest = (r, g, b) => { // get nearest color
 	}
 	return j;
 };
+if (!process.env.FIREBASE) { console.error("missing env FIREBASE"); return 3; }
+if (!process.env.FINGERPRINT) { console.error("missing env FINGERPRINT"); return 3; }
 let image;
 if ((argv.width && argv.height) || argv.dither) {
 	const buf = await (await Jimp.read(argv.file)).getBufferAsync("image/png");
