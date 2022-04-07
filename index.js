@@ -104,6 +104,7 @@ const colorNames = [
 	"yellow", "light green", "green", "aqua", "cyan", "blue", "magenta", "purple"
 ];
 const colors = colors_; delete colors_;
+process.chdir(__dirname);
 require("dotenv").config();
 const ax = axios.create({
 	baseURL: "https://pixelcanvas.io/api/",
