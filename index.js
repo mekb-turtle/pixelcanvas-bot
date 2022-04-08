@@ -379,6 +379,10 @@ for (let i = 0; i < pixels.length; ++i) {
 			break;
 		} catch (err) {
 			console.error(err);
+			if (err.response?.status == 412) {
+				await sleep(10e3, i+1, pixels.length);
+				continue;
+			}
 			return 2;
 		}
 	}
