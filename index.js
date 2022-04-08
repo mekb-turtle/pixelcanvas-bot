@@ -84,8 +84,14 @@ const isNum = (e, a, p) => {
 		return true;
 	}
 }
-if (argv.output != null) if (isStr(argv.output, "--output")) return 7;
-if (!argv.debug || argv.file != null) if (isStr(argv.file, "--file")) return 7;
+if (argv.output != null) {
+	if (isStr(argv.output, "--output")) return 7;
+	argv.output = path.resolve(argv.output);
+}
+if (!argv.debug || argv.file != null) {
+	if (isStr(argv.file, "--file")) return 7;
+	argv.file = path.resolve(argv.file);
+}
 if ((argv.file && !argv.debug) || argv.x != null || argv.y != null) {
 	if (isNum(argv.x, "-x")) return 7;
 	if (isNum(argv.y, "-y")) return 7;
@@ -142,8 +148,10 @@ const colorNames = [
 	"yellow", "light green", "green", "aqua", "cyan", "blue", "magenta", "purple"
 ];
 const colors = colors_; delete colors_;
+let oldPwd = process.cwd();
 process.chdir(__dirname);
 require("dotenv").config();
+process.chdir(oldPwd);
 const ax = axios.create({
 	baseURL: "https://pixelcanvas.io/api/",
 	timeout: 10000,
