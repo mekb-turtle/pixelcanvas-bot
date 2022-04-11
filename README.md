@@ -11,13 +11,18 @@ Setup:
 - Open network tab in developer tools
 - Click a pixel on the canvas to draw it
 - Open one of the network requests that says `pixel` (not `online` or `X.Y.bmp`)
-- Add `FIREBASE=` followed by the value of `X-Firebase-AppCheck` from the request headers to the `.env` file
-- Add `FINGERPRINT=` followed by the value of `fingerprint` from the request body as JSON to the `.env` file
+- Open the Request tab
+- Add `FIREBASE=` followed by the value of `appCheckToken` from the request body to the `.env` file
+- Add `FINGERPRINT=` followed by the value of `fingerprint` from the request body to the `.env` file
 - Use `node . --help` for help
 
-If you get 401 Unauthorized, your firebase header or fingerprint is invalid, delete the `.env` file and redo the "Setup" starting from "Create a new file called `.env`".
-If you get 412 Precondition Failed, you have placed a pixel too recently, your cooldown hasn't expired yet.
+The X-Firebase-AppCheck header has recently been moved to appCheckToken in the request body
 
-I've only tested this on Arch Linux and Windows 10.
+If you get 401 Unauthorized, your firebase header or fingerprint is invalid. Delete the `.env` file and redo the "Setup" starting from "Create a new file called `.env`".
+
+If you get 412 Precondition Failed, you have placed a pixel too recently, your cooldown hasn't expired yet. The program should wait in intervals of 10 seconds until this is over.
+
+I've only tested this on Artix Linux and Windows 10.
+
 The countdown/progress indicator won't show correctly on some Windows versions.
 

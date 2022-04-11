@@ -242,14 +242,13 @@ const drawPixel = async ({ x, y, color }) => {
 	let res = await ax({
 		method: "post",
 		url: "pixel",
-		headers: {
-			"X-Firebase-AppCheck": process.env.FIREBASE
-		},
+//		headers: { "X-Firebase-AppCheck": process.env.FIREBASE },
 		data: {
-			x, y, color,
+			appCheckToken: process.env.FIREBASE,
+			color,
 			fingerprint: process.env.FINGERPRINT,
-			token: null,
-			wasabi: x + y + 2342
+			wasabi: x + y + 2342,
+			x, y
 		}
 	});
 	if (!res.data.result.data.success) throw res.data.result;
