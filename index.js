@@ -7,7 +7,7 @@ const { spawn } = require("child_process");
 let unknown;
 let opt = {
 	string: [ "file", "output", "expiry" ],
-	boolean: [ "help", "random", "reverse", "dither", "white", "ignore", "quiet", "debug", "noexisting", "noshorten" ],
+	boolean: [ "help", "random", "reverse", "dither", "white", "ignore", "quiet", "debug", "noexisting", "noshorten", "verbose" ],
 	alias: {
 		"help": [ "?" ],
 		"file": [ "f" ],
@@ -30,6 +30,7 @@ let opt = {
 		"quiet": [ "q" ],
 		"output": [ "o" ],
 		"expiry": [ "e" ],
+		"verbose": [ "v" ],
 	},
 	unknown: (e) => { unknown = e; },
 };
@@ -60,6 +61,7 @@ if (argv.help) {
 	console.error("  --ewidth -W       width for --output");
 	console.error("  --eheight -H      height for --output");
 	console.error("  --help -?         help");
+	console.error("  --verbose -v      show full error instead of short description");
 	console.error("");
 	return 8;
 }
@@ -140,6 +142,12 @@ if (expiryMatch[4]) expiryTime += parseInt(expiryMatch[4]) * 1e3;
 delete expiryMatch;
 if (argv.debug && argv.quiet && !argv.output) { console.error("nothing will happen"); return 0; }
 if (!argv.x) argv.x = 0; if (!argv.y) argv.y = 0;
+const logError = err => {
+	console.error(argv.verbose ? err : err.response ? `${err.name}: ${err.message}` : err.stack);
+	if (err.status == 401) {
+		console.error("Your firebase token or fingerprint is invalid, refer to README.md for instructions");
+	}
+}
 const paletteFile = path.resolve(__dirname, "./palette.png"); // read palette image
 const palette = await Jimp.read(paletteFile);
 let colors_ = [];
@@ -343,23 +351,25 @@ if (argv.output) {
 		let ewidth = isE ? argv.ewidth : image.bitmap.width;
 		let eheight = isE ? argv.eheight : image.bitmap.height;
 		image2 = await Jimp.create(ewidth, eheight);
-		for (let y = 0; y < eheight; ++y) {
-			for (let x = 0; x < ewidth; ++x) {
-				// new color
-				let ox = ex-argv.x+x;
-				let oy = ey-argv.y+y;
-				let oox = ox<0 || ox>=image.bitmap.width;
-				let ooy = oy<0 || oy>=image.bitmap.height;
-				let oc = oox || ooy ? 0 : image.getPixelColor(ox, oy);
-				if (oc & 0xff > 127) {
-					image2.setPixelColor(oc, x, y);
-				} else {
+		try {
+			for (let y = 0; y < eheight; ++y) {
+				for (let x = 0; x < ewidth; ++x) {
+					// new color
+					let ox = ex-argv.x+x;
+					let oy = ey-argv.y+y;
+					let oox = ox<0 || ox>=image.bitmap.width;
+					let ooy = oy<0 || oy>=image.bitmap.height;
+					let oc = oox || ooy ? 0 : image.getPixelColor(ox, oy);
+					if (oc & 0xff > 127) {
+						image2.setPixelColor(oc, x, y);
+					} else {
 					// original color from pixelcanvas
-					let c = await getPixel(x+ex, y+ey);
-					image2.setPixelColor(Jimp.rgbaToInt(...colors[c], 255), x, y);
+						let c = await getPixel(x+ex, y+ey);
+						image2.setPixelColor(Jimp.rgbaToInt(...colors[c], 255), x, y);
+					}
 				}
 			}
-		}
+		} catch (err) { logError(err); }
 		await fs.promises.writeFile(argv.output, await image2.getBufferAsync("image/png"));
 	}
 }
@@ -391,7 +401,7 @@ for (let i = 0; i < pixels.length; ++i) {
 			await sleep(Math.floor(res.waitSeconds * 1e3), i+1, pixels.length);
 			break;
 		} catch (err) {
-			console.error(err);
+			logError(err);
 			if (err.response?.status == 412) {
 				await sleep(10e3, i+1, pixels.length);
 				continue;

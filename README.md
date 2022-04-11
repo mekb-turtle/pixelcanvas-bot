@@ -1,4 +1,4 @@
-### [Pixel Canvas](https://pixelcanvas.io) bot
+### [PixelCanvas.io](https://pixelcanvas.io) bot
 
 ## ![Color Palette](palette_preview.png)
 
@@ -7,7 +7,7 @@ Setup:
 - Clone the repository using `git clone https://github.com/mekb-turtle/pixel-canvas-bot.git` or download .zip/.tar.gz of the repository and extract it
 - Run `npm i` in the directory to install the dependencies
 - Create a new file called `.env` in the directory of the repository
-- Go to [Pixel Canvas](https://pixelcanvas.io)
+- Go to [PixelCanvas.io](https://pixelcanvas.io)
 - Open network tab in developer tools
 - Click a pixel on the canvas to draw it
 - Open one of the network requests that says `pixel` (not `online` or `X.Y.bmp`)
@@ -16,9 +16,9 @@ Setup:
 - Add `FINGERPRINT=` followed by the value of `fingerprint` from the request body to the `.env` file
 - Use `node . --help` for help
 
-The `X-Firebase-AppCheck` header has recently been moved to `appCheckToken` in the request body
+The `X-Firebase-AppCheck` header has recently been moved to `appCheckToken` in the request body. Tokens now expire must quicker, and a CAPTCHA has been added.
 
-If you get 401 Unauthorized, your firebase header or fingerprint is invalid. Delete the `.env` file and redo the "Setup" starting from "Create a new file called `.env`".
+If you get 401 Unauthorized, your firebase token or fingerprint is invalid. Delete the `.env` file and redo the "Setup" starting from "Create a new file called `.env`".
 
 If you get 412 Precondition Failed, you have placed a pixel too recently, your cooldown hasn't expired yet. The program should wait in intervals of 10 seconds until this is over.
 
