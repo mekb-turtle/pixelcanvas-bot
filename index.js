@@ -7,7 +7,7 @@ const { spawn } = require("child_process");
 let unknown;
 let opt = {
 	string: [ "file", "output", "expiry" ],
-	boolean: [ "help", "random", "reverse", "dither", "white", "ignore", "quiet", "debug", "noexisting" ],
+	boolean: [ "help", "random", "reverse", "dither", "white", "ignore", "quiet", "debug", "noexisting", "noshorten" ],
 	alias: {
 		"help": [ "?" ],
 		"file": [ "f" ],
@@ -21,6 +21,7 @@ let opt = {
 		"dither": [ "d" ],
 		"x": [ "x_" ], // this is required otherwise it'll think this is unknown
 		"y": [ "y_" ],
+		"noshorten": [ "N" ],
 		"random": [ "r" ],
 		"reverse": [ "R" ],
 		"white": [ "i" ],
@@ -48,7 +49,8 @@ if (argv.help) {
 	console.error("  --white -i        don't draw white pixels, act as if all pixels are white by default");
 	console.error("  --ignore -I       don't check existing pixels, makes --expiry useless");
 	console.error("  --expiry -e       expiry time of chunk cache for existing pixels, default: 1h");
-	console.error("output:");
+	console.error("feedback:");
+	console.error("  --noshorten -N    don't shorten multiple skipped pixels into one line");
 	console.error("  --debug -D        don't actually draw anything, just say what would be drawn unless --quiet is specified");
 	console.error("  --quiet -q        don't output anything, does nothing if --debug is specified and not --output");
 	console.error("  --output -o       output image of what would be drawn to a file, use with -D and -q");
@@ -61,6 +63,7 @@ if (argv.help) {
 	console.error("");
 	return 8;
 }
+for (i in argv) { if (argv[i] === false) argv[i] = null; };
 if (unknown == null && argv._.length) unknown = argv._[0];
 if (unknown) {
 	console.error("unexpected", unknown);
@@ -121,10 +124,11 @@ if (argv.output) {
 	if (argv.ey != null)      console.error("-Y ignored");
 	if (argv.noexisting)      console.error("--noexisting ignored");
 }
-if (argv.ignore && argv.expiry) console.error("--expiry ignored");
+if (argv.ignore && argv.expiry != null) console.error("--expiry ignored");
 if (argv.expiry == null) argv.expiry = "1h";
 if (argv.output != null && (argv.x == null || argv.y == null)) { console.error("--noexisting enabled as -x and -y are left out"); argv.noexisting = true; }
 else if (argv.debug && argv.noexisting && (argv.x != null || argv.y != null)) console.error("-x -y ignored");
+if (argv.quiet && argv.noshorten) console.error("--noshorten ignored");
 if (isStr(argv.expiry, "--expiry")) return 7;
 let expiryMatch = argv.expiry.match(/^(?:([0-6])d)?(?:([0-9]|1[0-9]|2[0-3])h)?(?:([0-9]|[1-5][0-9])m)?(?:([0-9]|[1-5][0-9])s)?$/i);
 if (!expiryMatch) { console.error("invalid --expiry"); return 7; }
@@ -234,17 +238,27 @@ const sleep = async (ms, a, b) => {
 	}
 	await doSleep(ms);
 };
+let consecutiveSkips = 0;
+const shortenSkipThreshold = 11;
 const drawPixel = async ({ x, y, color }) => {
 	let skipped = argv.debug ? false : (color == await getPixel(x, y));
-	if (!argv.quiet) console.log((skipped ? "skipped " : "") + "drawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
+	if (!argv.noshorten && skipped) {
+		++consecutiveSkips;
+	} else {
+		if (consecutiveSkips >= shortenSkipThreshold) console.log("skipped", consecutiveSkips, "pixels");
+		consecutiveSkips = 0;
+	}
+	if (consecutiveSkips == shortenSkipThreshold) console.log("skipping")
+	if (consecutiveSkips < shortenSkipThreshold && !argv.quiet)
+		console.log((skipped ? "skipped " : "") + "drawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
 	if (argv.debug) return { };
 	if (skipped) return { };
 	let res = await ax({
 		method: "post",
 		url: "pixel",
-//		headers: { "X-Firebase-AppCheck": process.env.FIREBASE },
+		//headers: { "X-Firebase-AppCheck": process.env.FIREBASE },
 		data: {
-			appCheckToken: process.env.FIREBASE,
+			appCheckToken: process.env.FIREBASE, // site changes
 			color,
 			fingerprint: process.env.FINGERPRINT,
 			wasabi: x + y + 2342,
