@@ -16,7 +16,7 @@ Setup:
 - Add `FINGERPRINT=` followed by the value of `fingerprint` from the request body to the `.env` file
 - Use `node . --help` for help
 
-The X-Firebase-AppCheck header has recently been moved to appCheckToken in the request body
+The `X-Firebase-AppCheck` header has recently been moved to `appCheckToken` in the request body
 
 If you get 401 Unauthorized, your firebase header or fingerprint is invalid. Delete the `.env` file and redo the "Setup" starting from "Create a new file called `.env`".
 
