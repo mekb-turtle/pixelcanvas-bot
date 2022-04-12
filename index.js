@@ -51,6 +51,9 @@ if (unknown) {
 	console.error("unexpected", unknown);
 	return;
 }
+const randNum = (max, min) => {
+	return min ? (Math.floor(Math.random() * (+max++ - +min)) + +min) : (Math.floor(Math.random() * Math.floor(max++)))
+}
 const isStr = (e, a) => {
 	if (typeof e != "string" || e == null || e == "") {
 		console.error(`missing ${a}`);
@@ -232,7 +235,8 @@ for (let i = 0; i < pixels.length; ++i) {
 		try {
 			let res = await drawPixel(pixels[i]);
 			if (argv.debug) break; // don't sleep with --debug
-			await sleep(Math.floor(res.waitSeconds * 1e3), i+1, pixels.length);
+			const waitSeconds = res.waitSeconds + randNum(15, 0.5)
+			await sleep(Math.floor(waitSeconds * 1e3), i+1, pixels.length);
 			break;
 		} catch (err) {
 			console.error(err);
