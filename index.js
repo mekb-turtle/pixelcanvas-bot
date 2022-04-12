@@ -224,7 +224,7 @@ image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 		// don't need to use nearest twice
 		let color = colors.map(e => e.join()).indexOf([r, g, b].join());
 		// indexOf doesn't work with an array of arrays, but array of strings work
-		if (color == 0 && argv.ignore) return; 
+		if (color == 0 && argv.ignore) return;
 		pixels.push({ x: X, y: Y, color });
 	}
 });
@@ -241,7 +241,7 @@ for (let i = 0; i < pixels.length; ++i) {
 		} catch (err) {
 			console.error(err);
 			if (argv.debug) break;
-			await sleep(10e3, i+1, pixels.length); // wait 10 seconds 
+			await sleep(10e3, i+1, pixels.length); // wait 10 seconds
 		}
 	}
 }
