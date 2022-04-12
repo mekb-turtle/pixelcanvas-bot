@@ -6,7 +6,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 let unknown;
 let opt = {
-	string: [ "file", "output", "expiry" ],
+	string: [ "file", "output", "expiry", "delay" ],
 	boolean: [ "help", "random", "reverse", "dither", "white", "ignore", "quiet", "debug", "noexisting", "noshorten", "verbose" ],
 	alias: {
 		"help": [ "?" ],
@@ -31,62 +31,73 @@ let opt = {
 		"output": [ "o" ],
 		"expiry": [ "e" ],
 		"verbose": [ "v" ],
+		"delay": [ "Q" ],
 	},
 	unknown: (e) => { unknown = e; },
 };
 const argv = require("minimist")(process.argv.splice(2), opt);
 if (argv.help) {
-	console.error("image:");
-	console.error("  --file -f            what file to draw");
-	console.error("  -x                   left-most pixel of the image");
-	console.error("  -y                   top-most pixel of the image");
-	console.error("use -x-5 or -x=-5 for negative numbers, -x -5 won't work");
-//	console.error("  --width -w           width of image");
-//	console.error("  --height -h          height of image");
-//	console.error("if both width and height are left out, image size will be left as is");
-	console.error("  --random -r          draw each pixel in a random order");
-	console.error("  --reverse -R         reverse order to draw pixels");
-	console.error("  --dither -d          dither the image");
-	console.error("  --white -i           don't draw white pixels, act as if all pixels are white by default");
-	console.error("  --ignore -I          don't check existing pixels, makes --expiry useless");
-	console.error("  --expiry -e          expiry time of chunk cache for existing pixels, default: 1h");
-	console.error("output:");
-	console.error("  --noshorten -N       don't shorten multiple skipped pixels into one line");
-	console.error("  --debug -D           don't actually draw anything, just say what would be drawn unless --quiet is specified");
-	console.error("  --quiet -q           don't output anything, does nothing if --debug is specified and not --output");
-	console.error("  --output -o          output image of what would be drawn to a file, use with -D and -q");
-	console.error("  --noexisting -O      don't show existing pixels with -o, defaults to yes if -x and -y are left out");
-	console.error("  --ex -X              left-most pixel for --output");
-	console.error("  --ey -Y              top-most pixel for --output");
-	console.error("  --ewidth -W          width for --output");
-	console.error("  --eheight -H         height for --output");
-	console.error("other:");
-	console.error("  --verbose -v         show full error instead of short description");
-	console.error("  --help -?            help");
-	console.error("");
+	process.stderr.write("image:\n");
+	process.stderr.write("  --file -f            what file to draw\n");
+	process.stderr.write("  -x                   left-most pixel of the image\n");
+	process.stderr.write("  -y                   top-most pixel of the image\n");
+	process.stderr.write("use -x-5 or -x=-5 for negative numbers, -x -5 won't work\n");
+//	process.stderr.write("  --width -w           width of image\n");
+//	process.stderr.write("  --height -h          height of image\n");
+//	process.stderr.write("if both width and height are left out, image size will be left as is\n");
+	process.stderr.write("  --random -r          draw each pixel in a random order\n");
+	process.stderr.write("  --reverse -R         reverse order to draw pixels\n");
+	process.stderr.write("  --dither -d          dither the image\n");
+	process.stderr.write("  --white -i           don't draw white pixels, act as if all pixels are white by default\n");
+	process.stderr.write("  --ignore -I          don't check existing pixels, makes --expiry useless\n");
+	process.stderr.write("  --expiry -e          expiry time of chunk cache for existing pixels, default: 1h\n");
+	process.stderr.write("  --delay -Q           delay after placing every pixel, default is 1,10 = random 1 second to 10 seconds, 5 = 5 seconds, none/null/0/0,0 = no delay\n");
+	process.stderr.write("output:\n");
+	process.stderr.write("  --noshorten -N       don't shorten multiple skipped pixels into one line");
+	process.stderr.write("  --debug -D           don't actually draw anything, just say what would be drawn unless --quiet is specified\n");
+	process.stderr.write("  --quiet -q           don't output anything, does nothing if --debug is specified and not --output\n");
+	process.stderr.write("  --output -o          output image of what would be drawn to a file, use with -D and -q\n");
+	process.stderr.write("  --noexisting -O      don't show existing pixels with -o, defaults to yes if -x and -y are left out\n");
+	process.stderr.write("  --ex -X              left-most pixel for --output\n");
+	process.stderr.write("  --ey -Y              top-most pixel for --output\n");
+	process.stderr.write("  --ewidth -W          width for --output\n");
+	process.stderr.write("  --eheight -H         height for --output\n");
+	process.stderr.write("other:\n");
+	process.stderr.write("  --verbose -v         show full error instead of short description\n");
+	process.stderr.write("  --help -?            help\n\n");
 	return 8;
 }
-for (i in argv) { if (argv[i] === false) argv[i] = null; };
+for (i in argv) { if (argv[i] === false) argv[i] = null; }; // i probably put some if (argv.__ != null) instead of if (argv.__) somewhere so this will fix it
 if (unknown == null && argv._.length) unknown = argv._[0];
 if (unknown) {
-	console.error("unexpected", unknown);
+	console.error("Unexpected", unknown);
 	return 7;
 }
 for (let i = 0; i < opt.boolean.length; ++i) {
-	if (typeof argv[opt.boolean[i]] != "boolean" && argv[opt.boolean[i]] != null) {
-		console.error("wrong type -" + (opt.boolean[i].length > 1 ? "-" : "") + opt.boolean[i]);
+	if (typeof argv[opt.boolean[i]] != "boolean" && argv[opt.boolean[i]] != null) { // there's a way to make these boolean arguments actually a string, so this fixes it
+		console.error("Wrong type -" + (opt.boolean[i].length > 1 ? "-" : "") + opt.boolean[i]);
 		return 7;
 	}
 }
-const isStr = (e, a) => {
+for (let i = 0; i < opt.string.length; ++i) {
+	if (typeof argv[opt.string[i]] != "string" && argv[opt.string[i]] != null) { // maybe string too, i'm not sure
+		console.error("Wrong type -" + (opt.string[i].length > 1 ? "-" : "") + opt.string[i]);
+		return 7;
+	}
+}
+const random = (a, b) => {
+	if (b == null) [ a, b ] = [ 0, a ]; // if only max is specified, make it from 0 to max
+	return Math.floor(Math.random() * (b - a)) + a;
+}
+const isStr = (e, a) => { // functions to check argument makes sense
 	if (typeof e != "string" || e == null || e == "") {
-		console.error(`missing ${a}`);
+		console.error(`Missing ${a}`);
 		return true;
 	}
 }
 const isNum = (e, a, p) => {
 	if (typeof e != "number" || e != Math.floor(e) || e >= 1e9 || e <= (p ? 0 : -1e9)) {
-		console.error(e == null ? `missing ${a}` : `invalid ${a}`);
+		console.error(e == null ? `Missing ${a}` : `Invalid ${a}`);
 		return true;
 	}
 }
@@ -107,7 +118,7 @@ if ((argv.file && !argv.debug) || argv.x != null || argv.y != null) {
 	}
 }
 let isE = false;
-if (argv.output) {
+if (argv.output) { // different logic depending on different arguments
 	if (argv.ewidth != null || argv.eheight != null || argv.ex != null || argv.ey != null) {
 		if (argv.existing) {
 			console.error("--existing specified without --file"); return 7;
@@ -118,7 +129,7 @@ if (argv.output) {
 		if (isNum(argv.eheight, "--eheight", true)) return 7;
 		isE = true;
 	} else if (!argv.file) {
-		console.error("no --file or -WHXY argumets specified"); return 7;
+		console.error("No --file or -WHXY argumets specified"); return 7;
 	}
 } else {
 	if (argv.ewidth != null)  console.error("--ewidth ignored");
@@ -134,18 +145,25 @@ else if (argv.debug && argv.noexisting && (argv.x != null || argv.y != null)) co
 if (argv.quiet && argv.noshorten) console.error("--noshorten ignored");
 if (isStr(argv.expiry, "--expiry")) return 7;
 let expiryMatch = argv.expiry.match(/^(?:([0-6])d)?(?:([0-9]|1[0-9]|2[0-3])h)?(?:([0-9]|[1-5][0-9])m)?(?:([0-9]|[1-5][0-9])s)?$/i);
-if (!expiryMatch) { console.error("invalid --expiry"); return 7; }
+if (!expiryMatch) { console.error("Invalid --expiry"); return 7; }
 let expiryTime = 0;
 if (expiryMatch[1]) expiryTime += parseInt(expiryMatch[1]) * 24 * 3600e3;
 if (expiryMatch[2]) expiryTime += parseInt(expiryMatch[2]) * 3600e3;
 if (expiryMatch[3]) expiryTime += parseInt(expiryMatch[3]) * 60e3;
 if (expiryMatch[4]) expiryTime += parseInt(expiryMatch[4]) * 1e3;
 delete expiryMatch;
-if (argv.debug && argv.quiet && !argv.output) { console.error("nothing will happen"); return 0; }
+if (argv.delay == "none" || argv.delay == "null") argv.delay = "0,0";
+if (argv.delay == null) argv.delay = "1,10";
+if (isStr(argv.delay, "--delay")) return 7;
+let delayMatch = argv.delay.match(/^([0-9]|[1-9][0-9]{1,2}|[12][0-9]{3}|3[0-5][0-9]{2})(?:,([0-9]|[1-9][0-9]{1,2}|[12][0-9]{3}|3[0-5][0-9]{2}))?$/);
+if (!delayMatch) { console.error("Invalid --delay"); return 7; }
+let minDelay = parseInt(delayMatch[1]);
+let maxDelay = delayMatch[2] ? parseInt(delayMatch[2]) : minDelay;
+if (argv.debug && argv.quiet && !argv.output) { console.error("Nothing will happen"); return 0; }
 if (!argv.x) argv.x = 0; if (!argv.y) argv.y = 0;
 const logError = err => {
 	console.error(argv.verbose ? err : err.response ? `${err.name}: ${err.message}` : err.stack);
-	if (err.status == 401) {
+	if (err.response.status == 401) {
 		console.error("Your firebase token or fingerprint is invalid, refer to README.md for instructions");
 	}
 }
@@ -229,6 +247,8 @@ const div = (e) => e==0?0 : Math.floor((e+bigChunkDiff)/bigChunkSize)*15;
 // gets the color of the pixel at a position
 const getPixel = async (x, y) => (await getChunk(div(x),div(y))).data[mod(x)+mod(y)*bigChunkSize];
 const doSleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const upLine = "\x1b[1A";
+const startOfLine = "\x1b[2K\x1b[0G";
 const sleep = async (ms, a, b) => {
 	const sec_ = Math.floor(ms / 1000);
 	let sec = sec_;
@@ -241,25 +261,28 @@ const sleep = async (ms, a, b) => {
 		if (sec >= 60        ) str += Math.floor(sec/(60)%60     ) + "m ";
 		if (sec >= 1         ) str += Math.floor(sec%60          ) + "s ";
 		let text = `${a}/${b} ${Math.floor(a/b * 100)}%`;
-		if (!argv.quiet) process.stderr.write(text + " " + str);
+		if (!argv.quiet) process.stdout.write(text + " " + str);
 		await doSleep(1000);
-		if (!argv.quiet) process.stderr.write("\x1b[2K\x1b[0G");
+		if (!argv.quiet) process.stdout.write(startOfLine);
 	}
 	await doSleep(ms);
 };
 let consecutiveSkips = 0;
-const shortenSkipThreshold = 11;
+const shortenSkipThreshold = 21;
 const drawPixel = async ({ x, y, color }) => {
 	let skipped = argv.debug ? false : (color == await getPixel(x, y));
 	if (!argv.noshorten && skipped) {
 		++consecutiveSkips;
 	} else {
-		if (consecutiveSkips >= shortenSkipThreshold) console.log("skipped", consecutiveSkips, "pixels");
+		if (consecutiveSkips >= shortenSkipThreshold) process.stdout.write("\n");
 		consecutiveSkips = 0;
 	}
-	if (consecutiveSkips == shortenSkipThreshold) console.log("skipping")
+	if (!argv.noshorten) {
+		if (consecutiveSkips == shortenSkipThreshold) process.stdout.write(`${startOfLine}${upLine}`.repeat(consecutiveSkips-1));
+		if (consecutiveSkips >= shortenSkipThreshold) process.stdout.write(`${startOfLine}Skipped ${consecutiveSkips} pixels`);
+	}
 	if (consecutiveSkips < shortenSkipThreshold && !argv.quiet)
-		console.log((skipped ? "skipped " : "") + "drawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
+		console.log((skipped ? "Skipped d" : "D") + "rawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
 	if (argv.debug) return { };
 	if (skipped) return { };
 	let res = await ax({
@@ -383,7 +406,7 @@ image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 		// don't need to use nearest twice
 		let color = colors.map(e => e.join()).indexOf([r, g, b].join());
 		// indexOf doesn't work with an array of arrays, but array of strings work
-		if (color == 0 && argv.white) return; 
+		if (color == 0 && argv.white) return;
 		pixels.push({ x: X, y: Y, color });
 	}
 });
@@ -394,17 +417,22 @@ for (let i = 0; i < pixels.length; ++i) {
 	while (true) {
 		try {
 			if (!argv.debug) {
-				if (!process.env.FIREBASE) { console.error("missing env FIREBASE"); return 3; }
-				if (!process.env.FINGERPRINT) { console.error("missing env FINGERPRINT"); return 3; }
+				if (!process.env.FIREBASE) { console.error("Missing FIREBASE environment variable"); return 3; }
+				if (!process.env.FINGERPRINT) { console.error("Missing FINGERPRINT environment variable"); return 3; }
 			}
 			let res = await drawPixel(pixels[i]);
+			if (res.waitSeconds == null) break;
 			if (argv.debug) break; // don't sleep with --debug
-			await sleep(Math.floor(res.waitSeconds * 1e3), i+1, pixels.length);
+			let sleepTime = Math.ceil(res.waitSeconds * 1e3);
+			sleepTime += random(minDelay, maxDelay);
+			await sleep(sleepTime, i+1, pixels.length);
 			break;
 		} catch (err) {
 			logError(err);
 			if (err.response?.status == 412) {
-				await sleep(10e3, i+1, pixels.length);
+				let sleepTime = 10e3;
+				sleepTime += random(minDelay, maxDelay);
+				await sleep(sleepTime, i+1, pixels.length);
 				continue;
 			}
 			return 2;
