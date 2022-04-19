@@ -163,7 +163,7 @@ if (argv.debug && argv.quiet && !argv.output) { console.error("Nothing will happ
 if (!argv.x) argv.x = 0; if (!argv.y) argv.y = 0;
 const logError = err => {
 	console.error(argv.verbose ? err : err.response ? `${err.name}: ${err.message}` : err.stack);
-	if (err.response.status == 401) {
+	if (err.response?.status == 401) {
 		console.error("Your firebase token or fingerprint is invalid, refer to README.md for instructions");
 	}
 }
