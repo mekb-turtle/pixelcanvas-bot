@@ -433,6 +433,7 @@ for (let i = 0; i < pixels.length; ++i) {
 				let sleepTime = 10e3;
 				sleepTime += random(minDelay, maxDelay);
 				await sleep(sleepTime, i+1, pixels.length);
+				if (!argv.verbose) process.stdout.write(startOfLine + upLine + startOfLine + upLine + startOfLine);
 				continue;
 			}
 			return 2;
