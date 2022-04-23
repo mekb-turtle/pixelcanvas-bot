@@ -87,7 +87,7 @@ for (let i = 0; i < opt.string.length; ++i) {
 }
 const random = (a, b) => {
 	if (b == null) [ a, b ] = [ 0, a ]; // if only max is specified, make it from 0 to max
-	return Math.floor(Math.random() * (b - a)) + a;
+	return Math.floor((Math.random() * (b - a) + a) * 1e3);
 }
 const isStr = (e, a) => { // functions to check argument makes sense
 	if (typeof e != "string" || e == null || e == "") {
