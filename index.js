@@ -411,7 +411,14 @@ image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, i) => {
 	}
 });
 delete image; // don't need anymore
-if (argv.random) pixels.sort(() => Math.random() - 0.5); // shuffle array
+if (argv.random) {
+	for (let i = pixels.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		const t = pixels[i];
+		pixels[i] = pixels[j];
+		pixels[j] = t;
+	}
+}
 if (argv.reverse) pixels.reverse(); // reverse array
 for (let i = 0; i < pixels.length; ++i) {
 	while (true) {
