@@ -260,7 +260,10 @@ const sleep = async (ms, a, b) => {
 		if (sec >= 60*60     ) str += Math.floor(sec/(60*60)%24  ) + "h ";
 		if (sec >= 60        ) str += Math.floor(sec/(60)%60     ) + "m ";
 		if (sec >= 1         ) str += Math.floor(sec%60          ) + "s ";
-		let text = `${a}/${b} ${Math.floor(a/b * 100)}%`;
+		let percentage = Math.floor(a/b * 10000)/100+"";
+		while (percentage.split(".")[0].length < 2) percentage = "0" + percentage;
+		while (percentage.split(".")[1].length < 2) percentage += "0";
+		let text = `${a}/${b} ${percentage}%`;
 		if (!argv.quiet) process.stdout.write(text + " " + str);
 		await doSleep(1000);
 		if (!argv.quiet) process.stdout.write(startOfLine);
