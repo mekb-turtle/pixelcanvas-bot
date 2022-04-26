@@ -1,6 +1,4 @@
-### [PixelCanvas.io](https://pixelcanvas.io) bot
-
-## ![Color Palette](palette_preview.png)
+## [PixelCanvas.io](https://pixelcanvas.io) bot
 
 Setup: (assuming Firefox, but any web browser would work)
 - Install [Node.js](https://nodejs.org/) and [ImageMagick](https://imagemagick.org/)

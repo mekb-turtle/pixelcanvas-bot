@@ -1,6 +1,6 @@
 {
   "name": "pixel-canvas-bot",
-  "description": "A bot for https://pixelcanvas.io",
+  "description": "A bot for PixelCanvas",
   "main": "index.js",
   "author": "mekb",
   "dependencies": {

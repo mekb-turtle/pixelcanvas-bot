@@ -174,35 +174,16 @@ palette.scan(0, 0, palette.bitmap.width, palette.bitmap.height, (x, y, i) => {
 	if (palette.bitmap.data[i + 3] > 127) // make sure the color isn't transparent
 		colors_.push([palette.bitmap.data[i + 0], palette.bitmap.data[i + 1], palette.bitmap.data[i + 2]]); // no need for alpha
 });
-const colorNames = [
-	"white", "light gray", "dark gray", "black", "pink", "red", "orange", "brown",
-	"yellow", "light green", "green", "aqua", "cyan", "blue", "magenta", "purple"
-];
 const colors = colors_; delete colors_;
 let oldPwd = process.cwd();
 process.chdir(__dirname);
 require("dotenv").config();
 process.chdir(oldPwd);
 const ax = axios.create({
-	baseURL: "https://pixelcanvas.io/api/",
+	baseURL: "http://localhost:8080/",
 	timeout: 10000,
-	headers: `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0
-Origin: https://pixelcanvas.io
-Referer: https://pixelcanvas.io
-DNT: 1
-Sec-Fetch-Dest: empty
-Sec-Fetch-Mode: cors
-Sec-Fetch-Site: same-origin
-Cache-Control: no-cache
-TE: trailers`
-		.split("\n")
-		.map(e => [ e.split(": ")[0], e.split(": ").splice(1) ])
-		.reduce((a,b) => { a[b[0]] = b[1]; return a }, {}),
 });
-const chunkSize = 64;
-const bigChunks = 15;
-const bigChunkSize = chunkSize*bigChunks;
-const bigChunkDiff = chunkSize*7;
+const chunkSize = 256;
 const chunkCache = {};
 const getChunk = async (cx, cy) => {
 	let cacheName = `${cx}.${cy}`;
@@ -212,65 +193,22 @@ const getChunk = async (cx, cy) => {
 	if (!chunkCache[cacheName]) {
 		let res = await ax({
 			method: "get",
-			url: `bigchunk/${cx}.${cy}.bmp`,
+			url: `chunk?x=${cx}&y=${cy}&format=color`,
 			responseType: "arraybuffer"
 		});
-		let chunks = [];
-		for (let j = 0; j < bigChunks**2; ++j) { // loop all 15x15 chunks
-			chunks.push(Buffer.alloc(chunkSize**2)); // add to chunk array
-			for (let i = 0; i < chunkSize**2/2; ++i) {
-				let i_ = i + (j/2*chunkSize**2);
-				chunks[j][i*2]   = res.data[i_] >> 4; // high byte
-				chunks[j][i*2+1] = res.data[i_] & 0x0F; // low byte
-			}
-		}
-		delete res;
-		let bigChunk = [];
-		for (let j = 0; j < bigChunkSize**2; ++j) {
-			let x_ = j % bigChunkSize; // current x
-			let y_ = Math.floor(j / bigChunkSize); // current y
-			let i_ = Math.floor(x_ / chunkSize) + Math.floor(y_ / chunkSize) * bigChunks; // current chunk index
-			let x = x_ % chunkSize; // current x in chunk
-			let y = y_ % chunkSize; // current y in chunk
-			let i = x + y * chunkSize; // current index in chunk
-			bigChunk.push(chunks[i_][i]);
-		}
-		delete chunks;
-		chunkCache[cacheName] = { creation: Date.now(), data: bigChunk };
+		chunkCache[cacheName] = { creation: Date.now(), data: res.data };
 	}
 	return chunkCache[`${cx}.${cy}`];
 };
 // mod converts a position to the position in that chunk
-const mod = (e) => (e+bigChunkDiff<0 ? bigChunkSize-1-(-e-1-bigChunkDiff)%bigChunkSize : (e+bigChunkDiff)%bigChunkSize);
+const mod = (e) => e==0?0: e<0 ? chunkSize-1-(-e-1)%chunkSize : e%chunkSize;
 // div converts a position to what chunk it's in
-const div = (e) => e==0?0 : Math.floor((e+bigChunkDiff)/bigChunkSize)*15;
+const div = (e) => e==0?0: Math.floor(e/chunkSize);
 // gets the color of the pixel at a position
-const getPixel = async (x, y) => (await getChunk(div(x),div(y))).data[mod(x)+mod(y)*bigChunkSize];
+const getPixel = async (x, y) => (await getChunk(div(x),div(y))).data[mod(x)+mod(y)*chunkSize];
 const doSleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const upLine = "\x1b[1A";
 const startOfLine = "\x1b[2K\x1b[0G";
-const sleep = async (ms, a, b) => {
-	const sec_ = Math.floor(ms / 1000);
-	let sec = sec_;
-	ms = ms % 1000;
-	for (; sec > 0; --sec) {
-		let str = ""; // human readable time
-		if (sec >= 60*60*24*7) str += Math.floor(sec/(60*60*24*7)) + "w ";
-		if (sec >= 60*60*24  ) str += Math.floor(sec/(60*60*24)%7) + "d ";
-		if (sec >= 60*60     ) str += Math.floor(sec/(60*60)%24  ) + "h ";
-		if (sec >= 60        ) str += Math.floor(sec/(60)%60     ) + "m ";
-		if (sec >= 1         ) str += Math.floor(sec%60          ) + "s ";
-		let percentage = Math.floor(a/b * 10000)/100+"";
-		if (!percentage.includes(".")) percentage += ".0";
-		while (percentage.split(".")[0].length < 2) percentage = "0" + percentage;
-		while (percentage.split(".")[1].length < 2) percentage += "0";
-		let text = `${a}/${b} ${percentage}%`;
-		if (!argv.quiet) process.stdout.write(text + " " + str);
-		await doSleep(1000);
-		if (!argv.quiet) process.stdout.write(startOfLine);
-	}
-	await doSleep(ms);
-};
 let consecutiveSkips = 0;
 const shortenSkipThreshold = 21;
 const drawPixel = async ({ x, y, color }) => {
@@ -286,23 +224,13 @@ const drawPixel = async ({ x, y, color }) => {
 		if (consecutiveSkips >= shortenSkipThreshold) process.stdout.write(`${startOfLine}Skipped ${consecutiveSkips} pixels`);
 	}
 	if (consecutiveSkips < shortenSkipThreshold && !argv.quiet)
-		console.log((skipped ? "Skipped d" : "D") + "rawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
+		console.log((skipped ? "Skipped d" : "D") + "rawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0));
 	if (argv.debug) return { };
 	if (skipped) return { };
 	let res = await ax({
-		method: "post",
-		url: "pixel",
-		//headers: { "X-Firebase-AppCheck": process.env.FIREBASE },
-		data: {
-			appCheckToken: process.env.FIREBASE, // site changes
-			color,
-			fingerprint: process.env.FINGERPRINT,
-			wasabi: x + y + 2342,
-			x, y
-		}
+		method: "put",
+		url: `place?x=${x}&y=${y}&color=${color}`,
 	});
-	if (!res.data.result.data.success) throw res.data.result;
-	return res.data.result.data;
 };
 const dist3d = (x1, y1, z1, x2, y2, z2) => Math.sqrt(((x1-x2)**2) + ((y1-y2)**2) + ((z1-z2)**2));
 const nearest = (r, g, b) => { // get nearest color
@@ -426,29 +354,9 @@ if (argv.random) {
 if (argv.reverse) pixels.reverse(); // reverse array
 for (let i = 0; i < pixels.length; ++i) {
 	while (true) {
-		try {
-			if (!argv.debug) {
-				if (!process.env.FIREBASE) { console.error("Missing FIREBASE environment variable"); return 3; }
-				if (!process.env.FINGERPRINT) { console.error("Missing FINGERPRINT environment variable"); return 3; }
-			}
-			let res = await drawPixel(pixels[i]);
-			if (res.waitSeconds == null) break;
-			if (argv.debug) break; // don't sleep with --debug
-			let sleepTime = Math.ceil(res.waitSeconds * 1e3);
-			sleepTime += random(minDelay, maxDelay);
-			await sleep(sleepTime, i+1, pixels.length);
-			break;
-		} catch (err) {
-			logError(err);
-			if (err.response?.status == 412) {
-				let sleepTime = 10e3;
-				sleepTime += random(minDelay, maxDelay);
-				await sleep(sleepTime, i+1, pixels.length);
-				if (!argv.verbose) process.stdout.write(startOfLine + upLine + startOfLine + upLine + startOfLine);
-				continue;
-			}
-			return 2;
-		}
+		await drawPixel(pixels[i]);
+		if (argv.debug) break;
+		break;
 	}
 }
 return 0;
