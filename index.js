@@ -359,5 +359,6 @@ for (let i = 0; i < pixels.length; ++i) {
 		break;
 	}
 }
+console.log();
 return 0;
 })().then(e => process.exit(e || 0));
