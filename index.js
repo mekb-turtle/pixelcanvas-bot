@@ -187,12 +187,17 @@ const ax = axios.create({
 	baseURL: "https://pixelcanvas.io/api/",
 	timeout: 10000,
 	headers: `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0
+Accept: */*
+Content-Type: application/json
 Origin: https://pixelcanvas.io
 Referer: https://pixelcanvas.io
 DNT: 1
+Alt-Used: pixelcanvas.io
+Connection: keep-alive
 Sec-Fetch-Dest: empty
 Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
+Pragma: no-cache
 Cache-Control: no-cache
 TE: trailers`
 		.split("\n")
@@ -273,37 +278,6 @@ const sleep = async (ms, a, b) => {
 };
 let consecutiveSkips = 0;
 const shortenSkipThreshold = 21;
-const drawPixel = async ({ x, y, color }) => {
-	let skipped = argv.debug ? false : (color == await getPixel(x, y));
-	if (!argv.noshorten && skipped) {
-		++consecutiveSkips;
-	} else {
-		if (consecutiveSkips >= shortenSkipThreshold) process.stdout.write("\n");
-		consecutiveSkips = 0;
-	}
-	if (!argv.noshorten) {
-		if (consecutiveSkips == shortenSkipThreshold) process.stdout.write(`${startOfLine}${upLine}`.repeat(consecutiveSkips-1));
-		if (consecutiveSkips >= shortenSkipThreshold) process.stdout.write(`${startOfLine}Skipped ${consecutiveSkips} pixels`);
-	}
-	if (consecutiveSkips < shortenSkipThreshold && !argv.quiet)
-		console.log((skipped ? "Skipped d" : "D") + "rawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
-	if (argv.debug) return { };
-	if (skipped) return { };
-	let res = await ax({
-		method: "post",
-		url: "pixel",
-		//headers: { "X-Firebase-AppCheck": process.env.FIREBASE },
-		data: {
-			appCheckToken: process.env.FIREBASE, // site changes
-			color,
-			fingerprint: process.env.FINGERPRINT,
-			wasabi: x + y + 2342,
-			x, y
-		}
-	});
-	if (!res.data.result.data.success) throw res.data.result;
-	return res.data.result.data;
-};
 const dist3d = (x1, y1, z1, x2, y2, z2) => Math.sqrt(((x1-x2)**2) + ((y1-y2)**2) + ((z1-z2)**2));
 const nearest = (r, g, b) => { // get nearest color
 	let j;
@@ -424,6 +398,56 @@ if (argv.random) {
 	}
 }
 if (argv.reverse) pixels.reverse(); // reverse array
+let initialWait = false;
+const getWait = async () => {
+	let res = await ax({
+		method: "post",
+		url: `me`,
+		data: {
+			fingerprint: process.env.FINGERPRINT
+		}
+	});
+	let sleepTime_ = res.data?.result?.data?.waitSeconds;
+	if (!sleepTime_) return;
+	let sleepTime = Math.ceil(sleepTime_ * 1e3);
+	sleepTime += random(minDelay, maxDelay);
+	await sleep(sleepTime, 0, pixels.length);
+	throw 1;
+}
+const drawPixel = async ({ x, y, color }) => {
+	let skipped = argv.debug ? false : (color == await getPixel(x, y));
+	if (!argv.noshorten && skipped) {
+		++consecutiveSkips;
+	} else {
+		if (consecutiveSkips >= shortenSkipThreshold) process.stdout.write("\n");
+		consecutiveSkips = 0;
+	}
+	if (!argv.noshorten) {
+		if (consecutiveSkips == shortenSkipThreshold) process.stdout.write(`${startOfLine}${upLine}`.repeat(consecutiveSkips-1));
+		if (consecutiveSkips >= shortenSkipThreshold) process.stdout.write(`${startOfLine}Skipped ${consecutiveSkips} pixels`);
+	}
+	if (!skipped && !argv.debug && !initialWait) {
+		initialWait = true;
+		await getWait();
+	}
+	if (consecutiveSkips < shortenSkipThreshold && !argv.quiet)
+		console.log((skipped ? "Skipped d" : "D") + "rawing pixel at", x, y, "with color", (color + 1).toString().padStart(2, 0), colorNames[color]);
+	if (argv.debug) return { };
+	if (skipped) return { };
+	let res = await ax({
+		method: "post",
+		url: "pixel",
+		data: {
+			appCheckToken: process.env.FIREBASE, // site changes
+			color,
+			fingerprint: process.env.FINGERPRINT,
+			wasabi: x + y + 2342,
+			x, y
+		}
+	});
+	if (!res.data.result.data.success) throw res.data.result;
+	return res.data.result.data;
+};
 for (let i = 0; i < pixels.length; ++i) {
 	while (true) {
 		try {
@@ -441,9 +465,7 @@ for (let i = 0; i < pixels.length; ++i) {
 		} catch (err) {
 			logError(err);
 			if (err.response?.status == 412) {
-				let sleepTime = 10e3;
-				sleepTime += random(minDelay, maxDelay);
-				await sleep(sleepTime, i+1, pixels.length);
+				await getWait();
 				if (!argv.verbose) process.stdout.write(startOfLine + upLine + startOfLine + upLine + startOfLine);
 				continue;
 			}
@@ -451,5 +473,6 @@ for (let i = 0; i < pixels.length; ++i) {
 		}
 	}
 }
+console.log();
 return 0;
 })().then(e => process.exit(e || 0));
