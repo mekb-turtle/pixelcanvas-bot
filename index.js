@@ -187,8 +187,6 @@ const ax = axios.create({
 	baseURL: "https://pixelcanvas.io/api/",
 	timeout: 10000,
 	headers: `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0
-Accept: */*
-Content-Type: application/json
 Origin: https://pixelcanvas.io
 Referer: https://pixelcanvas.io
 DNT: 1
