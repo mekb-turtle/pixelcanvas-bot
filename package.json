@@ -4,7 +4,7 @@
   "main": "index.js",
   "author": "mekb",
   "dependencies": {
-    "axios": "^0.26.1",
+    "axios": "^0.28.0",
     "dotenv": "^16.0.0",
     "jimp": "^0.16.1",
     "minimist": "^1.2.6"
