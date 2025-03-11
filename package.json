@@ -4,9 +4,9 @@
   "main": "index.js",
   "author": "mekb",
   "dependencies": {
-    "axios": "^0.28.0",
-    "dotenv": "^16.0.0",
-    "jimp": "^0.16.1",
-    "minimist": "^1.2.6"
+    "axios": "^1.8.2",
+    "dotenv": "^16.4.7",
+    "jimp": "^0.16.13",
+    "minimist": "^1.2.8"
   }
 }
